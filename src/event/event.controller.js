@@ -1,3 +1,5 @@
+const pool = require("../db");
+
 const events = (req, res) => {
   const eventsJSON = [
     {

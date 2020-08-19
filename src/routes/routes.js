@@ -11,6 +11,7 @@ router.get(route.default, (req, res) => {
 });
 
 // auth routes
+router.post(route.register, authController.register);
 router.post(route.login, authController.login);
 router.post(route.logout, authController.logout);
 router.get(route.events, eventController.events);

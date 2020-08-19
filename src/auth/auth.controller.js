@@ -1,24 +1,182 @@
 // import AuthModel from "./auth.model";
 
+const pool = require("../db");
+const baseModel = require("../utils/base.model");
+
 const login = (req, res) => {
-  let user = req.body;
-  const { email } = user;
-  if (email === "superadmin@helpme.pk") {
-    user = {
-      email,
-      isAuthenticated: true,
-      roles: [{ id: 1, name: "SUPER_ADMIN" }],
-    };
-  } else if (email === "admin@helpme.pk") {
-    user = {
-      email,
-      isAuthenticated: true,
-      roles: [{ id: 1, name: "ADMIN" }],
-    };
-  } else if (email === "user@helpme.pk") {
-    user = { email, isAuthenticated: true, roles: [{ id: 1, name: "USER" }] };
+  const { email, password } = req.body;
+  const query = `SELECT * FROM accounts WHERE email = $1 AND password = $2`;
+
+  pool.query(query, [email, password], (error, result) => {
+    if (error) {
+      throw error;
+    }
+
+    if (result.rows.length > 0) {
+      const user = result.rows[0];
+      getUserRoleByUserId({ userId: user.id })
+        .then((roleResult) => {
+          if (roleResult.rows.length > 0) {
+            const resultModel = baseModel({
+              success: true,
+              message: "user is fetch successfully.",
+              data: {
+                email: result.rows[0].email,
+                isAuthenticated: true,
+                roles: roleResult.rows,
+              },
+            });
+            res.status(200).json(resultModel);
+          } else {
+            const resultModel = baseModel({
+              success: false,
+              message: error,
+            });
+            res.status(200).json(resultModel);
+          }
+        })
+        .catch((error) => {
+          const resultModel = baseModel({
+            success: false,
+            message: error,
+          });
+          res.status(200).json(resultModel);
+        });
+    } else {
+      const resultModel = baseModel({
+        success: false,
+        message: "incorrect username or password.",
+      });
+      res.status(200).json(resultModel);
+    }
+  });
+};
+
+const register = (req, res) => {
+  try {
+    getUserByEmail({ email: req.body.email })
+      .then((result) => {
+        if (result.rows.length > 0) {
+          const resultModel = baseModel({
+            success: true,
+            message: `User with ${req.body.email} email already exist.`,
+            data: null,
+          });
+          res.status(200).json(resultModel);
+        } else {
+          getUserByUsername({ username: req.body.username }).then((result) => {
+            if (result.rows.length > 0) {
+              const resultModel = baseModel({
+                success: true,
+                message: `User name ${req.body.username} is not available.`,
+                data: null,
+              });
+              res.status(200).json(resultModel);
+            } else {
+              getRoleByRoleName({ name: req.body.roleName || "USER" }).then(
+                (roleResult) => {
+                  if (roleResult.rows.length > 0) {
+                    const role = roleResult.rows[0];
+                    createUser({ user: req.body })
+                      .then((userResult) => {
+                        if (userResult.rows.length > 0) {
+                          const userId = userResult.rows[0].id;
+                          assignUserRole({ userId, roleId: role.id })
+                            .then((result) => {
+                              if (result.rows.length > 0) {
+                                const resultModel = baseModel({
+                                  success: true,
+                                  message: "user is created successfully.",
+                                  data: { ...userResult.rows, role },
+                                });
+                                res.status(200).json(resultModel);
+                              } else {
+                                const resultModel = baseModel({
+                                  success: false,
+                                  message: "user not created.",
+                                });
+                                res.status(200).json(resultModel);
+                              }
+                            })
+                            .catch((error) => {
+                              console.log("error", error);
+                              res.send(error);
+                            });
+                        }
+                      })
+                      .catch((error) => {
+                        console.log("error", error);
+                        res.send(error);
+                      });
+                  } else {
+                    const resultModel = baseModel({
+                      success: false,
+                      message: "something goes wrong please try again!",
+                    });
+                    res.status(200).json(resultModel);
+                  }
+                }
+              );
+            }
+          });
+        }
+      })
+      .catch((error) => {
+        console.log("error", error);
+        res.send(error);
+      });
+  } catch (error) {
+    console.log("API register error", error);
+    res.json(error);
   }
-  res.json(user);
+};
+
+const createUser = ({ user }) => {
+  const { firstname, lastname, username, email, password } = user;
+
+  const created_on = new Date(),
+    last_login = new Date();
+  const query = `INSERT INTO accounts (firstname, lastname, username, email, password, created_on, last_login)
+  VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`;
+
+  return pool.query(query, [
+    firstname,
+    lastname,
+    username,
+    email,
+    password,
+    created_on,
+    last_login,
+  ]);
+};
+
+const getUserByEmail = ({ email }) => {
+  const query = `SELECT * FROM accounts WHERE email = $1`;
+  return pool.query(query, [email]);
+};
+
+const getUserByUsername = ({ username }) => {
+  const query = `SELECT * FROM accounts WHERE username = $1`;
+  return pool.query(query, [username]);
+};
+
+const getRoleByRoleName = ({ name }) => {
+  const query = `SELECT * FROM roles WHERE name = $1`;
+  return pool.query(query, [name]);
+};
+
+const assignUserRole = ({ userId, roleId }) => {
+  const query = `INSERT INTO account_roles (user_id, role_id, grant_date)
+                VALUES ($1, $2, $3) RETURNING *`;
+  return pool.query(query, [userId, roleId, new Date()]);
+};
+
+const getUserRoleByUserId = ({ userId }) => {
+  const query = `SELECT account_roles.role_id as id, roles.name
+                FROM account_roles 
+                INNER JOIN roles
+                ON account_roles.user_id = $1 AND account_roles.role_id = roles.id`;
+  return pool.query(query, [userId]);
 };
 
 const logout = (req, res) => {
@@ -29,6 +187,7 @@ const logout = (req, res) => {
 };
 
 module.exports = {
+  register,
   login,
   logout,
 };

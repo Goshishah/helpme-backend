@@ -97,7 +97,7 @@ const loginController = (req, res) => {
       const isVerifyPassword = await verifyPassword(password, user.password);
       if (!isVerifyPassword) {
         const resultModel = baseModel({
-          success: true,
+          success: false,
           message: "incorrect username or password.",
         });
         res.status(200).json(resultModel);
@@ -106,11 +106,12 @@ const loginController = (req, res) => {
       getUserRoleByUserId({ userId: user.id })
         .then((roleResult) => {
           if (roleResult.rows.length > 0) {
+            delete result.rows[0].password;
             const resultModel = baseModel({
               success: true,
               message: "user is fetch successfully.",
               data: {
-                email: result.rows[0].email,
+                ...result.rows[0],
                 isAuthenticated: true,
                 roles: roleResult.rows,
               },
@@ -133,7 +134,7 @@ const loginController = (req, res) => {
         });
     } else {
       const resultModel = baseModel({
-        success: true,
+        success: false,
         message: "incorrect username or password.",
       });
       res.status(200).json(resultModel);

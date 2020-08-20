@@ -3,6 +3,7 @@ const route = {
   register: "/api/register",
   login: "/api/login",
   logout: "/api/logout",
+  users: "/api/users",
   events: "/api/events",
 };
 

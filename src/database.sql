@@ -7,7 +7,7 @@ CREATE TABLE accounts (
 	firstname VARCHAR (50) NOT NULL,
 	lastname VARCHAR (50),
 	username VARCHAR (50) UNIQUE NOT NULL,
-	password VARCHAR (50) NOT NULL,
+	password VARCHAR (60) NOT NULL,
 	created_on TIMESTAMP NOT NULL,
     last_login TIMESTAMP 
 );

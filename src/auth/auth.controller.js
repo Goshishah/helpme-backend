@@ -1,6 +1,7 @@
 // import AuthModel from "./auth.model";
 
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const pool = require("../db");
 const baseModel = require("../utils/base.model");
 
@@ -107,13 +108,14 @@ const loginController = (req, res) => {
         .then((roleResult) => {
           if (roleResult.rows.length > 0) {
             delete result.rows[0].password;
+            const accessToken = genrateAccessToken(result.rows[0]);
             const resultModel = baseModel({
               success: true,
               message: "user is fetch successfully.",
               data: {
                 ...result.rows[0],
-                isAuthenticated: true,
                 roles: roleResult.rows,
+                accessToken,
               },
             });
             res.status(200).json(resultModel);
@@ -143,10 +145,44 @@ const loginController = (req, res) => {
 };
 
 const logoutController = (req, res) => {
-  let user = req.body;
-  const { email } = user;
-  user = { email, isAuthenticated: false, roles: [{ id: 1, name: "USER" }] };
-  res.json(user);
+  const resultModel = baseModel({
+    success: true,
+    message: "user logged out successfuly.",
+    data: null,
+  });
+  res.status(200).json(resultModel);
+};
+
+const verifyController = (req, res) => {
+  getUserRoleByUserId({ userId: req.user.id })
+    .then((roleResult) => {
+      if (roleResult.rows.length > 0) {
+        const accessToken = genrateAccessToken(req.user);
+        const resultModel = baseModel({
+          success: true,
+          message: "user is fetch successfully.",
+          data: {
+            ...req.user,
+            roles: roleResult.rows,
+            accessToken,
+          },
+        });
+        res.status(200).json(resultModel);
+      } else {
+        const resultModel = baseModel({
+          success: false,
+          message: error,
+        });
+        res.status(200).json(resultModel);
+      }
+    })
+    .catch((error) => {
+      const resultModel = baseModel({
+        success: false,
+        message: error,
+      });
+      res.status(200).json(resultModel);
+    });
 };
 
 const createUser = async ({ user }) => {
@@ -208,8 +244,26 @@ const verifyPassword = async (password, hash) => {
   return await bcrypt.compare(password, hash);
 };
 
+const genrateAccessToken = (user) => {
+  return jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
+};
+
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+};
+
 module.exports = {
   register: registerController,
   login: loginController,
   logout: logoutController,
+  verify: verifyController,
+  authenticateToken,
 };

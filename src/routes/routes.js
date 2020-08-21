@@ -12,10 +12,19 @@ router.get(route.default, (req, res) => {
 });
 
 // auth routes
+router.get(
+  route.verify,
+  authController.authenticateToken,
+  authController.verify
+);
 router.post(route.register, authController.register);
 router.post(route.login, authController.login);
 router.post(route.logout, authController.logout);
-router.get(route.users, appUsersController.users);
+router.get(
+  route.users,
+  authController.authenticateToken,
+  appUsersController.users
+);
 router.get(route.events, eventController.events);
 
 // 404 not found route

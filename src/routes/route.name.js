@@ -6,6 +6,8 @@ const route = {
   logout: "/api/logout",
   users: "/api/users",
   events: "/api/events",
+  groups: "/api/groups",
+  beneficiaryDetails: "/api/beneficiary-details",
 };
 
 module.exports = route;

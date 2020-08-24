@@ -4,147 +4,76 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("../db");
 const baseModel = require("../utils/base.model");
+const addUser = require("../routes/users/addUser");
+const {
+  getUserByEmail,
+  getUserRoleByUserId,
+} = require("../users/app.users.controller");
 
-const registerController = (req, res) => {
-  try {
-    getUserByEmail({ email: req.body.email })
-      .then((result) => {
-        if (result.rows.length > 0) {
+const register = (req, res) => {
+  addUser(req, res);
+};
+
+const login = (req, res) => {
+  const { email, password } = req.body;
+  getUserByEmail({ email })
+    .then(async (userResult) => {
+      if (userResult.rows.length > 0) {
+        const user = userResult.rows[0];
+        const isVerifyPassword = await verifyPassword(password, user.password);
+        if (!isVerifyPassword) {
           const resultModel = baseModel({
-            success: true,
-            message: `User with ${req.body.email} email already exist.`,
-            data: null,
+            success: false,
+            message: "incorrect username or password.",
           });
           res.status(200).json(resultModel);
-        } else {
-          getUserByUsername({ username: req.body.username }).then((result) => {
-            if (result.rows.length > 0) {
+          return;
+        }
+        getUserRoleByUserId({ userId: user.id })
+          .then((roleResult) => {
+            if (roleResult.rows.length > 0) {
+              delete result.rows[0].password;
+              const accessToken = genrateAccessToken(result.rows[0]);
               const resultModel = baseModel({
                 success: true,
-                message: `User name ${req.body.username} is not available.`,
-                data: null,
+                message: "user is fetch successfully.",
+                data: {
+                  ...result.rows[0],
+                  roles: roleResult.rows,
+                  accessToken,
+                },
               });
               res.status(200).json(resultModel);
             } else {
-              getRoleByRoleName({ name: req.body.roleName || "USER" }).then(
-                (roleResult) => {
-                  if (roleResult.rows.length > 0) {
-                    const role = roleResult.rows[0];
-                    createUser({ user: req.body })
-                      .then((userResult) => {
-                        if (userResult.rows.length > 0) {
-                          const userId = userResult.rows[0].id;
-                          assignUserRole({ userId, roleId: role.id })
-                            .then((result) => {
-                              if (result.rows.length > 0) {
-                                const resultModel = baseModel({
-                                  success: true,
-                                  message: "user is created successfully.",
-                                  data: { ...userResult.rows, role },
-                                });
-                                res.status(200).json(resultModel);
-                              } else {
-                                const resultModel = baseModel({
-                                  success: false,
-                                  message: "user not created.",
-                                });
-                                res.status(200).json(resultModel);
-                              }
-                            })
-                            .catch((error) => {
-                              console.log("error", error);
-                              res.send(error);
-                            });
-                        }
-                      })
-                      .catch((error) => {
-                        console.log("error", error);
-                        res.send(error);
-                      });
-                  } else {
-                    const resultModel = baseModel({
-                      success: false,
-                      message: "something goes wrong please try again!",
-                    });
-                    res.status(200).json(resultModel);
-                  }
-                }
-              );
+              const resultModel = baseModel({
+                success: false,
+                message: error,
+              });
+              res.status(200).json(resultModel);
             }
-          });
-        }
-      })
-      .catch((error) => {
-        console.log("error", error);
-        res.send(error);
-      });
-  } catch (error) {
-    console.log("API register error", error);
-    res.json(error);
-  }
-};
-
-const loginController = (req, res) => {
-  const { email, password } = req.body;
-  const query = `SELECT * FROM accounts WHERE email = $1`;
-
-  pool.query(query, [email], async (error, result) => {
-    if (error) {
-      throw error;
-    }
-
-    if (result.rows.length > 0) {
-      const user = result.rows[0];
-      const isVerifyPassword = await verifyPassword(password, user.password);
-      if (!isVerifyPassword) {
-        const resultModel = baseModel({
-          success: false,
-          message: "incorrect username or password.",
-        });
-        res.status(200).json(resultModel);
-        return;
-      }
-      getUserRoleByUserId({ userId: user.id })
-        .then((roleResult) => {
-          if (roleResult.rows.length > 0) {
-            delete result.rows[0].password;
-            const accessToken = genrateAccessToken(result.rows[0]);
-            const resultModel = baseModel({
-              success: true,
-              message: "user is fetch successfully.",
-              data: {
-                ...result.rows[0],
-                roles: roleResult.rows,
-                accessToken,
-              },
-            });
-            res.status(200).json(resultModel);
-          } else {
+          })
+          .catch((error) => {
             const resultModel = baseModel({
               success: false,
               message: error,
             });
             res.status(200).json(resultModel);
-          }
-        })
-        .catch((error) => {
-          const resultModel = baseModel({
-            success: false,
-            message: error,
           });
-          res.status(200).json(resultModel);
+      } else {
+        const resultModel = baseModel({
+          success: false,
+          message: "incorrect username or password.",
         });
-    } else {
-      const resultModel = baseModel({
-        success: false,
-        message: "incorrect username or password.",
-      });
-      res.status(200).json(resultModel);
-    }
-  });
+        res.status(200).json(resultModel);
+      }
+    })
+    .catch((error) => {
+      console.log("error", error);
+      res.send(error);
+    });
 };
 
-const logoutController = (req, res) => {
+const logout = (req, res) => {
   const resultModel = baseModel({
     success: true,
     message: "user logged out successfuly.",
@@ -153,7 +82,7 @@ const logoutController = (req, res) => {
   res.status(200).json(resultModel);
 };
 
-const verifyController = (req, res) => {
+const verify = (req, res) => {
   getUserRoleByUserId({ userId: req.user.id })
     .then((roleResult) => {
       if (roleResult.rows.length > 0) {
@@ -185,61 +114,6 @@ const verifyController = (req, res) => {
     });
 };
 
-const createUser = async ({ user }) => {
-  const { firstname, lastname, username, email, password } = user;
-
-  const created_on = new Date(),
-    last_login = new Date();
-  const query = `INSERT INTO accounts (firstname, lastname, username, email, password, created_on, last_login)
-  VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, firstname, lastname, username, email, created_on, last_login`;
-
-  const hashedPassword = await hashPassword(password);
-  return pool.query(query, [
-    firstname,
-    lastname,
-    username,
-    email,
-    hashedPassword,
-    created_on,
-    last_login,
-  ]);
-};
-
-const getUserByEmail = ({ email }) => {
-  const query = `SELECT * FROM accounts WHERE email = $1`;
-  return pool.query(query, [email]);
-};
-
-const getUserByUsername = ({ username }) => {
-  const query = `SELECT * FROM accounts WHERE username = $1`;
-  return pool.query(query, [username]);
-};
-
-const getRoleByRoleName = ({ name }) => {
-  const query = `SELECT * FROM roles WHERE name = $1`;
-  return pool.query(query, [name]);
-};
-
-const assignUserRole = ({ userId, roleId }) => {
-  const query = `INSERT INTO account_roles (user_id, role_id, grant_date)
-                VALUES ($1, $2, $3) RETURNING *`;
-  return pool.query(query, [userId, roleId, new Date()]);
-};
-
-const getUserRoleByUserId = ({ userId }) => {
-  const query = `SELECT account_roles.role_id as id, roles.name
-                FROM account_roles 
-                INNER JOIN roles
-                ON account_roles.user_id = $1 AND account_roles.role_id = roles.id`;
-  return pool.query(query, [userId]);
-};
-
-const hashPassword = async (password) => {
-  const salt = await bcrypt.genSalt(10);
-  const hash = await bcrypt.hash(password, salt);
-  return hash;
-};
-
 const verifyPassword = async (password, hash) => {
   return await bcrypt.compare(password, hash);
 };
@@ -261,9 +135,9 @@ const authenticateToken = (req, res, next) => {
 };
 
 module.exports = {
-  register: registerController,
-  login: loginController,
-  logout: logoutController,
-  verify: verifyController,
+  register,
+  login,
+  logout,
+  verify,
   authenticateToken,
 };

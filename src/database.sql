@@ -30,3 +30,27 @@ CREATE TABLE account_roles (
 
 INSERT INTO roles (name)
   VALUES ("SUPER_ADMIN");
+  
+CREATE TABLE groups (
+  id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+  name VARCHAR (150) NOT NULL,
+  email VARCHAR (255) UNIQUE NOT NULL,
+  address VARCHAR (500) NOT NULL,
+  created_on TIMESTAMP NOT NULL,
+);
+
+CREATE TABLE beneficiary_detail (
+  id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id uuid NOT NULL,
+  created_on TIMESTAMP NOT NULL,
+  title VARCHAR (255) NOT NULL,
+  summary VARCHAR (5000) NOT NULL,
+  image VARCHAR (255) NOT NULL,
+  required_ammount NUMERIC(10,2) NOT NULL,
+  raised_ammount NUMERIC(10,2) NOT NULL,
+  benefactor_id uuid,
+  FOREIGN KEY (user_id)
+      REFERENCES accounts (id),
+  FOREIGN KEY (benefactor_id)
+      REFERENCES accounts (id)
+)

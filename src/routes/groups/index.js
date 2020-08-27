@@ -8,6 +8,6 @@ const groups = require("express").Router(),
 groups.get("/", authController.authenticateToken, getAllGroups);
 groups.post("/", authController.authenticateToken, addGroup);
 groups.put("/", authController.authenticateToken, updateGroup);
-groups.delete("/:id", authController.authenticateToken, deleteGroup);
+groups.delete("/", authController.authenticateToken, deleteGroup);
 
 module.exports = groups;

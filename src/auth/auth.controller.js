@@ -32,13 +32,13 @@ const login = (req, res) => {
         getUserRoleByUserId({ userId: user.id })
           .then((roleResult) => {
             if (roleResult.rows.length > 0) {
-              delete result.rows[0].password;
-              const accessToken = genrateAccessToken(result.rows[0]);
+              delete userResult.rows[0].password;
+              const accessToken = genrateAccessToken(userResult.rows[0]);
               const resultModel = baseModel({
                 success: true,
                 message: "user is fetch successfully.",
                 data: {
-                  ...result.rows[0],
+                  ...userResult.rows[0],
                   roles: roleResult.rows,
                   accessToken,
                 },
